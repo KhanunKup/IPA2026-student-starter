@@ -1,0 +1,11 @@
+desired:
+  name: Loopback104
+  ipv4: 10.0.29.150/32
+  description: Maintenance-Interface
+  admin_state: up
+
+current:
+  name: Loopback104
+  ipv4: 10.0.29.140/32
+  description: Maintenance-Interface
+  admin_state: down

@@ -1,0 +1,10 @@
+fixture: 06-update-ipv4-prefix-length.yaml
+
+expected:
+  status: ok
+  result: planned
+  operation: update
+  changes:
+    ipv4:
+      from: 192.168.1.1/24
+      to: 192.168.1.1/32

@@ -1,0 +1,11 @@
+desired:
+  name: Loopback103
+  ipv4: 10.254.1.100/32
+  description: Core-Migrated-IP
+  admin_state: up
+
+current:
+  name: Loopback103
+  ipv4: 172.16.50.10/32
+  description: Core-Old-IP
+  admin_state: up

@@ -1,0 +1,11 @@
+desired:
+  name: Loopback101
+  ipv4: 10.0.29.201/32
+  description: Router-Loopback
+  admin_state: up
+
+current:
+  name: Loopback101
+  ipv4: 10.0.29.101/32
+  description: Router-Loopback
+  admin_state: up

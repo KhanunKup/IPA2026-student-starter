@@ -1,0 +1,13 @@
+fixture: 07-update-ipv4-subnet-migration.yaml
+
+expected:
+  status: ok
+  result: planned
+  operation: update
+  changes:
+    ipv4:
+      from: 172.16.50.10/32
+      to: 10.254.1.100/32
+    description:
+      from: Core-Old-IP
+      to: Core-Migrated-IP
