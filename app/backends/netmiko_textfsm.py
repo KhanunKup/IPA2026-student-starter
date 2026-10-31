@@ -1,7 +1,9 @@
 import os
 import socket
+import time
 
-def get_interface_state(router,interface_name,netmiko_get=None):
+
+def get_interface_state(router, interface_name, netmiko_get=None):
     """Return normalized interface status using Netmiko + TextFSM."""
     if netmiko_get is None:
         user = os.getenv("ROUTER_USER", "")
@@ -17,14 +19,34 @@ def get_interface_state(router,interface_name,netmiko_get=None):
                 "fast_cli": False,
             }
             with ConnectHandler(**device) as net_connect:
-                ip_info = net_connect.send_command(
-                    f"show ip interface {iface_name}",
-                    use_textfsm=True,
-                )
-                descriptions = net_connect.send_command(
-                    "show interfaces description",
-                    use_textfsm=True,
-                )
+                try:
+                    ip_info = net_connect.send_command(
+                        f"show ip interface {iface_name}",
+                        use_textfsm=True,
+                    )
+                    if not isinstance(ip_info, list):
+                        ip_info = []
+                except Exception as exc:
+                    exc_name = type(exc).__name__
+                    if "textfsm" in exc_name.lower():
+                        ip_info = []
+                    else:
+                        raise
+
+                try:
+                    descriptions = net_connect.send_command(
+                        "show interfaces description",
+                        use_textfsm=True,
+                    )
+                    if not isinstance(descriptions, list):
+                        descriptions = []
+                except Exception as exc:
+                    exc_name = type(exc).__name__
+                    if "textfsm" in exc_name.lower():
+                        descriptions = []
+                    else:
+                        raise
+
                 return (
                     ip_info if isinstance(ip_info, list) else [],
                     descriptions if isinstance(descriptions, list) else [],
@@ -34,13 +56,13 @@ def get_interface_state(router,interface_name,netmiko_get=None):
         ip_info, descriptions = netmiko_get(router, interface_name)
     except PermissionError:
         return {"status": "error", "result": "authentication_failed"}
-    except (ConnectionError, socket.timeout, TimeoutError):
+    except (ConnectionError, socket.timeout, TimeoutError, EOFError):
         return {"status": "error", "result": "connection_failed"}
     except Exception as exc:
         exc_name = type(exc).__name__
         if "Authentication" in exc_name:
             return {"status": "error", "result": "authentication_failed"}
-        if "Timeout" in exc_name or "Connection" in exc_name:
+        if "Timeout" in exc_name or "Connection" in exc_name or "EOF" in exc_name:
             return {"status": "error", "result": "connection_failed"}
         return {"status": "error", "result": "backend_failed"}
 
@@ -89,7 +111,7 @@ def get_interface_state(router,interface_name,netmiko_get=None):
     }
 
 
-def delete_interface(router,interface_name,netmiko_delete=None):
+def delete_interface(router, interface_name, netmiko_delete=None):
     """Delete an interface using Netmiko."""
     if netmiko_delete is None:
         user = os.getenv("ROUTER_USER", "")
@@ -97,6 +119,15 @@ def delete_interface(router,interface_name,netmiko_delete=None):
 
         def netmiko_delete(r, iface_name):
             st = get_interface_state(r, iface_name)
+            if st.get("status") == "error":
+                res = st.get("result")
+                if res == "authentication_failed":
+                    raise PermissionError()
+                elif res == "connection_failed":
+                    raise ConnectionError()
+                else:
+                    raise RuntimeError(f"Backend failed: {st}")
+
             if st.get("status") == "ok" and st.get("result") == "not_found":
                 return "not_found"
 
@@ -111,22 +142,29 @@ def delete_interface(router,interface_name,netmiko_delete=None):
             with ConnectHandler(**device) as net_connect:
                 net_connect.send_config_set([f"no interface {iface_name}"])
 
+            time.sleep(1)
             st2 = get_interface_state(r, iface_name)
             if st2.get("status") == "ok" and st2.get("result") == "not_found":
                 return "deleted"
+
+            time.sleep(1)
+            st2 = get_interface_state(r, iface_name)
+            if st2.get("status") == "ok" and st2.get("result") == "not_found":
+                return "deleted"
+
             raise RuntimeError(f"Failed to delete interface {iface_name}")
 
     try:
         del_result = netmiko_delete(router, interface_name)
     except PermissionError:
         return {"status": "error", "result": "authentication_failed"}
-    except (ConnectionError, socket.timeout, TimeoutError):
+    except (ConnectionError, socket.timeout, TimeoutError, EOFError):
         return {"status": "error", "result": "connection_failed"}
     except Exception as exc:
         exc_name = type(exc).__name__
         if "Authentication" in exc_name:
             return {"status": "error", "result": "authentication_failed"}
-        if "Timeout" in exc_name or "Connection" in exc_name:
+        if "Timeout" in exc_name or "Connection" in exc_name or "EOF" in exc_name:
             return {"status": "error", "result": "connection_failed"}
         return {"status": "error", "result": "backend_failed"}
 
